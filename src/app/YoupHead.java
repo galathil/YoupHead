@@ -114,8 +114,8 @@ public class YoupHead {
 							Logger.debug("This creature does not exist.");
 							continue;
 						}
-						//tryFindLevels(wowheadDoc,tpl);
-						tryFindModelsInfo(wowheadDoc,tpl,creaturesModelInfo);
+						tryFindLevels(wowheadDoc,tpl);
+						//tryFindModelsInfo(wowheadDoc,tpl,creaturesModelInfo);
 					} catch (Exception e) {
 						Logger.error(e);
 					}
@@ -178,8 +178,9 @@ public class YoupHead {
 	private static boolean tryFindLevels(Document wowheadDoc, CreatureTemplate tpl) {
 		try {
 			String possibleLevelStringHtml = wowheadDoc.getElementById("infobox-contents-0").parent().selectFirst("script").html();
+			int level = -1;
 			
-			// Level exist?
+			// Level node exist?
 			Pattern p1 = Pattern.compile("Level: ");
 			Matcher m1 = p1.matcher(possibleLevelStringHtml);
 			boolean levelSectionfound=false;
@@ -195,28 +196,47 @@ public class YoupHead {
 			// Double level?
 			Pattern p2 = Pattern.compile("Level: ([0-9]+) - ([0-9]+)");
 			Matcher m2 = p2.matcher(possibleLevelStringHtml);
-			boolean minmaxfound=false;
 			while(m2.find()) {
 				//Logger.debug("minlevel="+m2.group(1)+", maxlevel="+m2.group(2));
-				minmaxfound=true;
+				level=Integer.parseInt(m2.group(1));
 			}
-			if(minmaxfound) { return true;}
+			//if(minmaxfound) { return true;}
 
 			// Simple level?
-			Pattern p3 = Pattern.compile("Level: ([0-9]+)");
-			Matcher m3 = p3.matcher(possibleLevelStringHtml);
-			boolean simplelevelfound=false;
-			while(m3.find()) {
-				//Logger.debug("minlevel=maxlevel="+m3.group(1));
-				simplelevelfound=true;
+			if(level<0) {
+				Pattern p3 = Pattern.compile("Level: ([0-9]+)");
+				Matcher m3 = p3.matcher(possibleLevelStringHtml);
+				while(m3.find()) {
+					//Logger.debug("minlevel=maxlevel="+m3.group(1));
+					level=Integer.parseInt(m3.group(1));
+				}
 			}
-			if(simplelevelfound) { return true;}
 			
-			Logger.info(possibleLevelStringHtml);
+			// Special case : level ??
+			if(level<0) {
+				Pattern p3 = Pattern.compile("Level: \\?\\?");
+				Matcher m3 = p3.matcher(possibleLevelStringHtml);
+				while(m3.find()) {
+					//Logger.debug("minlevel=maxlevel="+m3.group(1));
+					level=0;
+				}
+			}
+			
+			if(level>-1) {
+				Logger.tag("SQL").info("UPDATE creature_template SET minlevel={},maxlevel={} WHERE entry={};", level, level, tpl.entry);
+				return true;
+			} else {
+				Logger.tag("SQL").info("-- No level data found for entry={}", tpl.entry);
+			}
+
+			Logger.warn("No level data found for entry={}", tpl.entry);
+			Logger.warn(possibleLevelStringHtml);
 			return false;
 			
 		} catch(NullPointerException nullptr) {
 			Logger.error("Node for creature informations not found !");
+			Logger.error(nullptr);
+			Logger.tag("SQL").info("-- No level data found for entry={}", tpl.entry);
 			return false;
 		}
 	}
